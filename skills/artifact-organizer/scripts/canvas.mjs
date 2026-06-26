@@ -221,7 +221,9 @@ const CANVAS_JS = `
       a.addEventListener('click', function (e) {
         e.preventDefault();
         var el = document.getElementById(id);
-        if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!el) return;
+        openSection(el);                       // expand the target (accordion)
+        if (el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
     // Swap the rail group + tag title to whichever document is in view.
@@ -266,6 +268,35 @@ const CANVAS_JS = `
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollDocTop(); }
     });
   }
+
+  // ── Accordion: each document's sections collapse; one open at a time ──
+  function openSection(el) {
+    var slide = el.closest('.op-hero-slide');
+    var secs = slide ? slide.querySelectorAll('.op-section[id]') : [el];
+    Array.prototype.forEach.call(secs, function (s) {
+      s.classList.remove('op-open');
+      var t = s.querySelector('.op-section-title');
+      if (t) t.setAttribute('aria-expanded', 'false');
+    });
+    el.classList.add('op-open');
+    var ot = el.querySelector('.op-section-title');
+    if (ot) ot.setAttribute('aria-expanded', 'true');
+  }
+  Array.from(document.querySelectorAll('.op-hero-slide')).forEach(function (slide) {
+    var secs = Array.from(slide.querySelectorAll('.op-section[id]'));
+    secs.forEach(function (sec, i) {
+      if (i === 0) sec.classList.add('op-open');
+      var title = sec.querySelector('.op-section-title');
+      if (!title) return;
+      title.setAttribute('role', 'button');
+      title.setAttribute('tabindex', '0');
+      title.setAttribute('aria-expanded', i === 0 ? 'true' : 'false');
+      title.addEventListener('click', function () { openSection(sec); });
+      title.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSection(sec); }
+      });
+    });
+  });
 
   show(0);
 }());
@@ -696,41 +727,63 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
 }
 
 /* Sections: generous rhythm, hairline divider between them */
+/* Accordion: each section is a card; the title (+lead) is the always-visible
+   header, the body collapses. Only the open section shows its body. */
 .op-canvas-slide-inner .op-section {
-  padding: 0;
-  border: none;
   max-width: none;
-  margin-top: clamp(40px, 6vh, 72px);
-  padding-top: clamp(40px, 6vh, 72px);
-  border-top: 1px solid var(--op-color-border);
-  scroll-margin-top: clamp(96px, 13vh, 132px);
+  margin-top: 10px;
+  padding: clamp(16px, 2vw, 22px) clamp(18px, 2.2vw, 26px);
+  border: 1px solid var(--op-color-border);
+  border-radius: var(--op-radius-std, 10px);
+  background: var(--op-color-card, var(--op-color-surface));
+  scroll-margin-top: clamp(84px, 12vh, 120px);
+  transition: border-color 0.15s ease;
 }
-.op-canvas-slide-inner .op-page-main > .op-section:first-child {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
-}
+.op-canvas-slide-inner .op-page-main > .op-section:first-child { margin-top: 0; }
+.op-canvas-slide-inner .op-section.op-open { border-color: var(--op-color-fg-muted); }
 
-/* Section heading = blog H2 (NOT the old tiny mono eyebrow) */
+/* Header row — clickable, with a chevron that flips when open */
 .op-canvas-slide-inner .op-section-title {
   font-family: var(--op-font-display, var(--op-font-sans));
-  font-size: clamp(22px, 2.6vw, 30px);
+  font-size: clamp(18px, 2.1vw, 24px);
   font-weight: 600;
-  letter-spacing: -0.015em;
-  line-height: 1.25;
+  letter-spacing: -0.014em;
+  line-height: 1.3;
   text-transform: none;
   color: var(--op-color-fg);
+  margin: 0;
   padding: 0;
   border: none;
-  margin: 0 0 6px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.op-canvas-slide-inner .op-section-title::after {
+  content: "";
+  flex: none;
+  width: 9px; height: 9px;
+  border-right: 2px solid var(--op-color-fg-muted);
+  border-bottom: 2px solid var(--op-color-fg-muted);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+  margin: 0 2px 4px 0;
+}
+.op-canvas-slide-inner .op-section.op-open > .op-section-title::after {
+  transform: rotate(-135deg);
+  margin-bottom: 0;
 }
 .op-canvas-slide-inner .op-section-lead {
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 0.95rem;
+  line-height: 1.55;
   color: var(--op-color-fg-muted);
-  margin: 0 0 18px;
+  margin: 8px 0 0;
 }
-.op-canvas-slide-inner .op-section-body { margin-top: 14px; }
+/* Collapsed by default; the open section reveals its body */
+.op-canvas-slide-inner .op-section-body { display: none; margin-top: 16px; }
+.op-canvas-slide-inner .op-section.op-open > .op-section-body { display: block; }
 
 /* Subheadings + body rhythm */
 .op-canvas-slide-inner .op-heading-h3 {
