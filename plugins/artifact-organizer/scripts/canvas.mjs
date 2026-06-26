@@ -201,12 +201,16 @@ const CANVAS_JS = `
   if (csiItems.length) {
     var scroller = document.querySelector('.op-hero-slide-active .op-canvas-slide-body')
                 || document.querySelector('.op-canvas-slide-body');
-    var byId = {};
+    var tagLabel = document.querySelector('.op-canvas-section-tag .op-cst-label');
+    var byId = {}, titleById = {};
     csiItems.forEach(function (a) {
-      byId[a.getAttribute('data-csi')] = a;
+      var id = a.getAttribute('data-csi');
+      byId[id] = a;
+      var lbl = a.querySelector('.op-csi-label');
+      titleById[id] = lbl ? lbl.textContent : '';
       a.addEventListener('click', function (e) {
         e.preventDefault();
-        var el = document.getElementById(a.getAttribute('data-csi'));
+        var el = document.getElementById(id);
         if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
@@ -217,6 +221,7 @@ const CANVAS_JS = `
           csiItems.forEach(function (x) { x.classList.remove('op-csi-active'); });
           var a = byId[en.target.id];
           if (a) a.classList.add('op-csi-active');
+          if (tagLabel && titleById[en.target.id]) tagLabel.textContent = titleById[en.target.id];
         });
       }, { root: scroller, rootMargin: '-15% 0px -75% 0px', threshold: 0 });
       csiItems.forEach(function (a) {
@@ -369,8 +374,9 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
 </div>`;
   }).join("\n");
 
-  // Right-rail section index, built from the featured document's Sections.
   const sections = collectSections(feat);
+  // Number rail (click-to-jump index) + a frameout-style vertical tag at the
+  // very edge that shows the current section title. Both update on scroll.
   const sectionIndexHtml = sections.length >= 2
     ? `<nav class="op-canvas-section-index" aria-label="Sections">` +
       sections.map((sec, i) =>
@@ -380,12 +386,19 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
       ).join("") +
       `</nav>`
     : "";
+  const sectionTagHtml = sections.length >= 1
+    ? `<aside class="op-canvas-section-tag" aria-hidden="true">` +
+      `<span class="op-cst-label">${escapeHtml(sections[0].title)}</span>` +
+      `<span class="op-cst-arrow">↘</span>` +
+      `</aside>`
+    : "";
 
   const stageHtml = `
 <section class="op-hero-carousel">
   <div class="op-hero-stage">
     ${slidesHtml}
     ${sectionIndexHtml}
+    ${sectionTagHtml}
     <div class="op-hero-overlay">
       <span></span>
       <span class="op-hero-counter">1 / ${total}</span>
@@ -507,7 +520,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--op-color-muted-fg);
+  color: var(--op-color-fg-muted);
 }
 .op-hero-slide-title {
   font-size: clamp(24px, 3vw, 44px);
@@ -517,7 +530,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
 }
 .op-hero-slide-desc {
   font-size: clamp(12px, 1.2vw, 14px);
-  color: var(--op-color-muted-fg);
+  color: var(--op-color-fg-muted);
   line-height: 1.5;
   max-width: 560px;
   margin-top: 2px;
@@ -531,7 +544,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   font-family: var(--op-font-mono);
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: var(--op-color-muted-fg);
+  color: var(--op-color-fg-muted);
   background: color-mix(in oklab, var(--op-color-bg) 70%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -653,7 +666,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
 /* ── Right-rail section index (vertical, centered) ── */
 .op-canvas-section-index {
   position: fixed;
-  right: clamp(10px, 2vw, 28px);
+  right: clamp(56px, 6vw, 92px);   /* sits just left of the edge tag */
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -699,8 +712,39 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   opacity: 1;
   color: var(--op-color-accent);
 }
+
+/* ── Right-edge vertical tag (frameout "Get in touch" style) ── */
+.op-canvas-section-tag {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 11px;
+  background: var(--op-color-fg);
+  color: var(--op-color-bg);
+  border-radius: 12px 0 0 12px;
+  box-shadow: var(--op-shadow-card);
+}
+.op-cst-label {
+  writing-mode: vertical-rl;
+  font-family: var(--op-font-display, var(--op-font-sans));
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  max-height: 56vh;
+  overflow: hidden;
+}
+.op-cst-arrow { font-size: 12px; opacity: 0.75; }
+
 @media (max-width: 900px) {
-  .op-canvas-section-index { display: none; }
+  .op-canvas-section-index,
+  .op-canvas-section-tag { display: none; }
 }
 
 /* ── Sections below the hero ── */
@@ -710,7 +754,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--op-color-muted-fg);
+  color: var(--op-color-fg-muted);
   padding: clamp(40px, 5vh, 64px) clamp(20px, 4vw, 80px) 16px;
 }
 .op-section-body { padding: 0; }
@@ -756,7 +800,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   background: transparent;
   border: 1px solid var(--op-color-border);
   border-radius: var(--op-radius-sm);
-  color: var(--op-color-muted-fg);
+  color: var(--op-color-fg-muted);
   cursor: pointer;
   flex-shrink: 0;
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
@@ -764,7 +808,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
 .op-canvas-theme-toggle:hover {
   background: var(--op-color-muted);
   color: var(--op-color-fg);
-  border-color: var(--op-color-muted-fg);
+  border-color: var(--op-color-fg-muted);
 }
 
 /* ── Array content grid (used when history[].content is an array) ── */
