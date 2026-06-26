@@ -282,15 +282,14 @@ const CANVAS_JS = `
     var ot = el.querySelector('.op-section-title');
     if (ot) ot.setAttribute('aria-expanded', 'true');
   }
-  Array.from(document.querySelectorAll('.op-hero-slide')).forEach(function (slide) {
-    var secs = Array.from(slide.querySelectorAll('.op-section[id]'));
-    secs.forEach(function (sec, i) {
-      if (i === 0) sec.classList.add('op-open');
+  // Only older documents collapse — the newest (slide 0) stays fully expanded.
+  Array.from(document.querySelectorAll('.op-hero-slide.op-doc-collapsed')).forEach(function (slide) {
+    Array.from(slide.querySelectorAll('.op-section[id]')).forEach(function (sec) {
       var title = sec.querySelector('.op-section-title');
       if (!title) return;
       title.setAttribute('role', 'button');
       title.setAttribute('tabindex', '0');
-      title.setAttribute('aria-expanded', i === 0 ? 'true' : 'false');
+      title.setAttribute('aria-expanded', 'false');
       title.addEventListener('click', function () { openSection(sec); });
       title.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSection(sec); }
@@ -434,10 +433,12 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
   ].filter(Boolean).join(" · ");
 
   const slidesHtml = slides.map((s, i) => {
-    // No bottom caption — the document carries its own title (op-page-title) in
-    // flow, and the right-rail index handles section navigation.
+    // The newest document (slide 0) reads fully expanded; older documents
+    // collapse into an accordion of section cards.
+    const cls = "op-hero-slide"
+      + (i === 0 ? " op-hero-slide-active" : " op-doc-collapsed");
     return `
-<div class="op-hero-slide${i === 0 ? " op-hero-slide-active" : ""}" id="op-slide-${i}" data-canvas-slide="${i}">
+<div class="${cls}" id="op-slide-${i}" data-canvas-slide="${i}">
   <div class="op-canvas-slide-body">
     <div class="op-canvas-slide-inner">
       ${s.contentHtml}
@@ -726,42 +727,62 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   margin: 0 0 clamp(28px, 4vh, 44px);
 }
 
-/* Sections: generous rhythm, hairline divider between them */
-/* Accordion: each section is a card; the title (+lead) is the always-visible
-   header, the body collapses. Only the open section shows its body. */
+/* Sections (default = newest document): full blog flow, all open, divider */
 .op-canvas-slide-inner .op-section {
   max-width: none;
+  margin-top: clamp(40px, 6vh, 72px);
+  padding-top: clamp(40px, 6vh, 72px);
+  border-top: 1px solid var(--op-color-border);
+  scroll-margin-top: clamp(96px, 13vh, 132px);
+}
+.op-canvas-slide-inner .op-page-main > .op-section:first-child {
+  margin-top: 0; padding-top: 0; border-top: none;
+}
+.op-canvas-slide-inner .op-section-title {
+  font-family: var(--op-font-display, var(--op-font-sans));
+  font-size: clamp(22px, 2.6vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  text-transform: none;
+  color: var(--op-color-fg);
+  margin: 0 0 6px;
+  padding: 0;
+  border: none;
+}
+.op-canvas-slide-inner .op-section-lead {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--op-color-fg-muted);
+  margin: 0 0 18px;
+}
+.op-canvas-slide-inner .op-section-body { margin-top: 14px; }
+
+/* ── Older documents (op-doc-collapsed): accordion of section cards ── */
+.op-doc-collapsed .op-canvas-slide-inner .op-section {
   margin-top: 10px;
-  padding: clamp(16px, 2vw, 22px) clamp(18px, 2.2vw, 26px);
+  padding: clamp(15px, 1.9vw, 20px) clamp(18px, 2.2vw, 26px);
   border: 1px solid var(--op-color-border);
   border-radius: var(--op-radius-std, 10px);
   background: var(--op-color-card, var(--op-color-surface));
   scroll-margin-top: clamp(84px, 12vh, 120px);
   transition: border-color 0.15s ease;
 }
-.op-canvas-slide-inner .op-page-main > .op-section:first-child { margin-top: 0; }
-.op-canvas-slide-inner .op-section.op-open { border-color: var(--op-color-fg-muted); }
-
-/* Header row — clickable, with a chevron that flips when open */
-.op-canvas-slide-inner .op-section-title {
-  font-family: var(--op-font-display, var(--op-font-sans));
-  font-size: clamp(18px, 2.1vw, 24px);
-  font-weight: 600;
-  letter-spacing: -0.014em;
-  line-height: 1.3;
-  text-transform: none;
-  color: var(--op-color-fg);
-  margin: 0;
-  padding: 0;
-  border: none;
+.op-doc-collapsed .op-canvas-slide-inner .op-page-main > .op-section:first-child {
+  margin-top: 0; padding-top: clamp(15px, 1.9vw, 20px); border-top: 1px solid var(--op-color-border);
+}
+.op-doc-collapsed .op-section.op-open { border-color: var(--op-color-fg-muted); }
+.op-doc-collapsed .op-canvas-slide-inner .op-section-title {
+  font-size: clamp(17px, 1.9vw, 21px);
   cursor: pointer;
   user-select: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  margin: 0;
 }
-.op-canvas-slide-inner .op-section-title::after {
+.op-doc-collapsed .op-canvas-slide-inner .op-section-title::after {
   content: "";
   flex: none;
   width: 9px; height: 9px;
@@ -771,19 +792,13 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   transition: transform 0.2s ease;
   margin: 0 2px 4px 0;
 }
-.op-canvas-slide-inner .op-section.op-open > .op-section-title::after {
+.op-doc-collapsed .op-section.op-open > .op-section-title::after {
   transform: rotate(-135deg);
   margin-bottom: 0;
 }
-.op-canvas-slide-inner .op-section-lead {
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--op-color-fg-muted);
-  margin: 8px 0 0;
-}
-/* Collapsed by default; the open section reveals its body */
-.op-canvas-slide-inner .op-section-body { display: none; margin-top: 16px; }
-.op-canvas-slide-inner .op-section.op-open > .op-section-body { display: block; }
+.op-doc-collapsed .op-canvas-slide-inner .op-section-lead { font-size: 0.92rem; margin: 8px 0 0; }
+.op-doc-collapsed .op-canvas-slide-inner .op-section-body { display: none; margin-top: 16px; }
+.op-doc-collapsed .op-section.op-open > .op-section-body { display: block; }
 
 /* Subheadings + body rhythm */
 .op-canvas-slide-inner .op-heading-h3 {
