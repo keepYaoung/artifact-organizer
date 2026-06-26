@@ -317,14 +317,12 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
       `${s.title ? `<span class="op-hero-slide-title">${escapeHtml(s.title)}</span>` : ""}` +
       `${s.description ? `<span class="op-hero-slide-desc">${escapeHtml(s.description)}</span>` : ""}`;
     const hasMeta = subtitleParts || s.title;
-    // Same title shown top (op-hero-slide-meta-top) and bottom — the top one is
-    // a persistent header so the artifact title is always visible regardless of
-    // scroll position; the canvas owns it, so the doc's own header is hidden.
-    const topMeta = hasMeta ? `<div class="op-hero-slide-meta op-hero-slide-meta-top">${metaInner}</div>` : "";
+    // Bottom-left gallery caption. The title at the TOP of the document comes
+    // from the artifact's own header (op-page-title), shown in-flow above the
+    // first section — not a floating overlay.
     const metaHtml = hasMeta ? `<div class="op-hero-slide-meta">${metaInner}</div>` : "";
     return `
 <div class="op-hero-slide${i === 0 ? " op-hero-slide-active" : ""}" data-canvas-slide="${i}">
-  ${topMeta}
   <div class="op-canvas-slide-body">
     <div class="op-canvas-slide-inner">
       ${s.contentHtml}
@@ -456,31 +454,9 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   pointer-events: none;
   z-index: 1;
 }
-/* ── Top gradient boundary behind the top slide title (mode-aware via bg) ── */
-.op-hero-slide::before {
-  content: '';
-  display: block;
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: auto;
-  height: clamp(150px, 22vh, 240px);
-  background: linear-gradient(to bottom,
-    var(--op-color-bg) 0%,
-    color-mix(in oklab, var(--op-color-bg) 68%, transparent) 52%,
-    transparent 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-/* ── Persistent top title (same text as the bottom), below the fixed nav ── */
-.op-hero-slide-meta-top {
-  top: clamp(60px, 7.5vh, 84px);
-  bottom: auto;
-}
-.op-hero-slide-meta-top .op-hero-slide-title {
-  font-size: clamp(20px, 2.4vw, 30px);
-  line-height: 1.12;
-}
-/* Canvas owns the title (top + bottom) — drop the doc's own header to dedupe */
-.op-canvas-slide-inner .op-page-header { display: none; }
+/* Keep the artifact's own title at the top of the document (above the first
+   section), but drop the lede/subtitle — title only. */
+.op-canvas-slide-inner .op-page-subtitle { display: none; }
 /* Slide-meta bottom-left label */
 .op-hero-slide-meta {
   position: absolute;
@@ -564,7 +540,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
      title scrim. */
   align-items: safe center;
   justify-content: center;
-  padding: clamp(132px, 18vh, 184px) clamp(20px, 4vw, 80px) clamp(120px, 18vh, 200px);
+  padding: clamp(92px, 12vh, 124px) clamp(20px, 4vw, 80px) clamp(120px, 18vh, 200px);
   overflow-y: auto;
 }
 .op-canvas-slide-inner {
