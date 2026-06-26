@@ -18,7 +18,7 @@ function fixture() {
 
 test("slugify: ascii + Hangul kept, rest collapsed", () => {
   assert.equal(slugify("March Growth!"), "march-growth");
-  assert.equal(slugify("호주 이주 Plan B"), "호주-이주-plan-b");
+  assert.equal(slugify("분기 리포트 Q2"), "분기-리포트-q2");
   assert.equal(slugify("///"), "deck");
 });
 
