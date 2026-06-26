@@ -6,6 +6,8 @@ this is the short version of what to do **on first run**.
 
 ## First run — ask three things, then remember them
 
+> Full detail: [SKILL.md → Step 0](skills/artifact-organizer/SKILL.md#step-0--initial-setup-ask-the-user-before-generating-anything) · [Step 0b (hosting)](skills/artifact-organizer/SKILL.md#step-0b--ask-where-the-output-should-live-local--free-github-pages--your-domain)
+
 Before generating or stacking anything, ask the user (and persist to
 `~/.artifact-organizer/preference.md` so you only ask once):
 
@@ -45,6 +47,8 @@ Before generating or stacking anything, ask the user (and persist to
 
 ## What this project does
 
+> Full detail: [SKILL.md → How to use](skills/artifact-organizer/SKILL.md#how-to-use) · [Envelope format](skills/artifact-organizer/SKILL.md#envelope-format) · [Component inventory](skills/artifact-organizer/SKILL.md#component-inventory)
+
 The organizer renders every artifact — and every document you stack into the
 feed — in **one chosen house style**. You emit semantic component JSON; the
 renderer owns all presentation. Stack documents newest-first; each becomes a
@@ -61,6 +65,8 @@ as a foreign iframe (that's the `--embed` opt-out, for verbatim only).
 
 ## Stacking documents
 
+> Full detail: [SKILL.md → Stacking mode](skills/artifact-organizer/SKILL.md#stacking-mode--organizemjs-accumulate-artifacts-over-time) · [Stacking an HTML artifact](skills/artifact-organizer/SKILL.md#stacking-an-html-artifact-the-user-hands-you)
+
 Add each artifact to a persistent deck with `organize.mjs`:
 
 ```bash
@@ -75,6 +81,8 @@ URL, so any document is directly shareable. The chosen theme, author, and hostin
 choice persist on the store — pass them once.
 
 ## Don't
+
+> Full detail: [SKILL.md → Semantic-only props](skills/artifact-organizer/SKILL.md#semantic-only-props--never-style) · [Error handling](skills/artifact-organizer/SKILL.md#error-handling)
 
 - Don't pick the theme (or skip the hosting/footer questions) silently on first
   run; ask. Once saved, don't re-ask.
