@@ -206,12 +206,12 @@ const CANVAS_JS = `
   }
 
   // ── Right-rail section index: click-to-scroll + active highlight ──
-  var csiItems = Array.from(document.querySelectorAll('.op-csi-item'));
+  var csiItems   = Array.from(document.querySelectorAll('.op-csi-item'));
+  var railGroups = Array.from(document.querySelectorAll('.op-csi-group'));
+  var tagLabel   = document.querySelector('.op-canvas-section-tag .op-cst-label');
   if (csiItems.length) {
-    // Single-document decks scroll the window; multi-slide decks scroll the
-    // internal slide body. Pick the matching IntersectionObserver root.
     var single = !!document.querySelector('.op-hero-single');
-    var scroller = single ? null
+    var root = single ? null
       : (document.querySelector('.op-hero-slide-active .op-canvas-slide-body')
          || document.querySelector('.op-canvas-slide-body'));
     var byId = {};
@@ -224,19 +224,31 @@ const CANVAS_JS = `
         if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
-    if ('IntersectionObserver' in window && (single || scroller)) {
+    // Swap the rail group + tag title to whichever document is in view.
+    var titleBySlide = {};
+    railGroups.forEach(function (g) { titleBySlide[g.getAttribute('data-slide')] = g.getAttribute('data-title') || ''; });
+    var curSlide = null;
+    function setDoc(si) {
+      if (si == null || si === curSlide) return;
+      curSlide = si;
+      railGroups.forEach(function (g) {
+        g.classList.toggle('op-csi-group-active', g.getAttribute('data-slide') === si);
+      });
+      if (tagLabel && titleBySlide[si] != null) tagLabel.textContent = titleBySlide[si];
+    }
+    var secEls = Array.from(document.querySelectorAll('.op-hero-slide .op-section[id]'));
+    if ('IntersectionObserver' in window && (single || root)) {
       var obs = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
           if (!en.isIntersecting) return;
+          var sl = en.target.closest('.op-hero-slide');
+          if (sl) setDoc(sl.getAttribute('data-canvas-slide'));
           csiItems.forEach(function (x) { x.classList.remove('op-csi-active'); });
           var a = byId[en.target.id];
           if (a) a.classList.add('op-csi-active');
         });
-      }, { root: scroller, rootMargin: '-15% 0px -75% 0px', threshold: 0 });
-      csiItems.forEach(function (a) {
-        var el = document.getElementById(a.getAttribute('data-csi'));
-        if (el) obs.observe(el);
-      });
+      }, { root: root, rootMargin: '-15% 0px -75% 0px', threshold: 0 });
+      secEls.forEach(function (el) { obs.observe(el); });
     }
   }
 
@@ -343,6 +355,7 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
       subtitle:    meta.subtitle    || typeLabel(feat.component),
       description: meta.description                        || "",
       date:        meta.date                               || "",
+      sections:    collectSections(feat),
       contentHtml: renderTree(feat, REGISTRY, ctx),
     });
   }
@@ -360,6 +373,7 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
       description: item.description                              || "",
       date:        item.date                                     || "",
       eyebrow:     item.eyebrow     || autoEyebrow,
+      sections:    collectSections(item.content),
       contentHtml: item.content ? renderContent(item.content, REGISTRY, ctx, item.contentLayout) : "",
     });
   });
@@ -401,21 +415,28 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
 </div>`;
   }).join("\n");
 
-  const sections = collectSections(feat);
-  // Number rail (click-to-jump index) + a frameout-style vertical tag at the
-  // very edge that shows the current section title. Both update on scroll.
-  const sectionIndexHtml = sections.length >= 2
-    ? `<nav class="op-canvas-section-index" aria-label="Sections">` +
-      sections.map((sec, i) =>
-        `<a class="op-csi-item" href="#${escapeHtml(sec.id)}" data-csi="${escapeHtml(sec.id)}">` +
-        `<span class="op-csi-num">${String(i + 1).padStart(2, "0")}</span>` +
-        `<span class="op-csi-label">${escapeHtml(sec.title)}</span></a>`
-      ).join("") +
-      `</nav>`
+  // Number rail (click-to-jump index), grouped per document — only the group
+  // for the document currently in view is shown (the JS swaps them on scroll).
+  // The frameout-style edge tag shows that document's title, also swapped.
+  const railGroups = slides
+    .map((s, si) => {
+      const secs = s.sections || [];
+      if (!secs.length) return "";
+      return `<div class="op-csi-group${si === 0 ? " op-csi-group-active" : ""}" data-slide="${si}" data-title="${escapeHtml(s.title)}">` +
+        secs.map((sec, i) =>
+          `<a class="op-csi-item" href="#${escapeHtml(sec.id)}" data-csi="${escapeHtml(sec.id)}">` +
+          `<span class="op-csi-num">${String(i + 1).padStart(2, "0")}</span>` +
+          `<span class="op-csi-label">${escapeHtml(sec.title)}</span></a>`
+        ).join("") +
+        `</div>`;
+    })
+    .join("");
+  const sectionIndexHtml = slides.some(s => (s.sections || []).length >= 2)
+    ? `<nav class="op-canvas-section-index" aria-label="Sections">${railGroups}</nav>`
     : "";
-  const sectionTagHtml = meta.title
+  const sectionTagHtml = (slides[0] && slides[0].title)
     ? `<aside class="op-canvas-section-tag" role="button" tabindex="0" title="맨 위로">` +
-      `<span class="op-cst-label">${escapeHtml(meta.title)}</span>` +
+      `<span class="op-cst-label">${escapeHtml(slides[0].title)}</span>` +
       `</aside>`
     : "";
 
@@ -731,13 +752,13 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   right: clamp(14px, 2vw, 30px);
   top: 50%;
   transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   z-index: 40;
   text-align: right;
   max-width: 30vw;
 }
+/* Only the in-view document's section group is shown. */
+.op-csi-group { display: none; flex-direction: column; gap: 4px; }
+.op-csi-group.op-csi-group-active { display: flex; }
 .op-csi-item {
   display: flex;
   align-items: baseline;
