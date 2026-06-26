@@ -199,8 +199,12 @@ const CANVAS_JS = `
   // ── Right-rail section index: click-to-scroll + active highlight ──
   var csiItems = Array.from(document.querySelectorAll('.op-csi-item'));
   if (csiItems.length) {
-    var scroller = document.querySelector('.op-hero-slide-active .op-canvas-slide-body')
-                || document.querySelector('.op-canvas-slide-body');
+    // Single-document decks scroll the window; multi-slide decks scroll the
+    // internal slide body. Pick the matching IntersectionObserver root.
+    var single = !!document.querySelector('.op-hero-single');
+    var scroller = single ? null
+      : (document.querySelector('.op-hero-slide-active .op-canvas-slide-body')
+         || document.querySelector('.op-canvas-slide-body'));
     var byId = {};
     csiItems.forEach(function (a) {
       var id = a.getAttribute('data-csi');
@@ -211,7 +215,7 @@ const CANVAS_JS = `
         if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
-    if ('IntersectionObserver' in window && scroller) {
+    if ('IntersectionObserver' in window && (single || scroller)) {
       var obs = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
           if (!en.isIntersecting) return;
@@ -404,7 +408,7 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
     : "";
 
   const stageHtml = `
-<section class="op-hero-carousel">
+<section class="op-hero-carousel${total <= 1 ? " op-hero-single" : ""}">
   <div class="op-hero-stage">
     ${slidesHtml}
     ${sectionIndexHtml}
@@ -598,6 +602,30 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   padding: clamp(92px, 12vh, 124px) clamp(20px, 4vw, 80px) clamp(160px, 24vh, 280px);
   overflow-y: auto;
 }
+
+/* Single-document deck (no history): flow naturally so the WINDOW scrolls
+   through every section. The nested 100lvh internal scroll is for the
+   multi-slide carousel only — on a lone document the page scroll would skip it,
+   leaving the last sections unreachable. */
+.op-hero-single .op-hero-stage {
+  height: auto;
+  min-height: 100lvh;
+  overflow: visible;
+}
+.op-hero-single .op-hero-slide {
+  position: relative;
+  inset: auto;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.op-hero-single .op-canvas-slide-body {
+  position: relative;
+  inset: auto;
+  overflow: visible;
+  padding-bottom: clamp(64px, 10vh, 120px);
+}
+
 /* ── Blog-article reading column (flat, single column, clean hierarchy) ── */
 .op-canvas-slide-inner {
   width: 100%;
@@ -731,7 +759,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 18px 20px;
+  padding: 18px 16px;
   background: var(--op-color-fg);
   color: var(--op-color-bg);
   border-radius: 0;
@@ -752,7 +780,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
 /* Shorter viewports (e.g. laptops): shrink the tag + tighten the rail so the
    top tag and the vertically-centered rail don't collide on the right edge. */
 @media (max-height: 940px) {
-  .op-canvas-section-tag { padding: 12px 14px; }
+  /* Keep the L/R padding identical to large screens; only the text shrinks. */
   .op-cst-label { font-size: 13px; max-height: 30vh; }
   .op-canvas-section-index { gap: 2px; }
   .op-csi-num { font-size: 9px; }
