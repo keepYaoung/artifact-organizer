@@ -603,28 +603,35 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   overflow-y: auto;
 }
 
-/* Single-document deck (no history): flow naturally so the WINDOW scrolls
-   through every section. The nested 100lvh internal scroll is for the
-   multi-slide carousel only — on a lone document the page scroll would skip it,
-   leaving the last sections unreachable. */
+/* Single-document deck (no history): flow as a normal article so the WINDOW
+   scrolls through every section. The nested 100lvh flex/absolute scroll model is
+   for the multi-slide carousel only — on a lone document it traps the content
+   and the page scroll skips past it, leaving the last sections unreachable.
+   !important + display:block force a plain, reliably-scrollable flow. */
 .op-hero-single .op-hero-stage {
-  height: auto;
-  min-height: 100lvh;
-  overflow: visible;
+  height: auto !important;
+  min-height: 100lvh !important;
+  overflow: visible !important;
+  display: block !important;
 }
 .op-hero-single .op-hero-slide {
-  position: relative;
-  inset: auto;
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
+  position: relative !important;
+  inset: auto !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transition: none !important;
 }
 .op-hero-single .op-canvas-slide-body {
-  position: relative;
-  inset: auto;
-  overflow: visible;
-  padding-bottom: clamp(64px, 10vh, 120px);
+  position: relative !important;
+  inset: auto !important;
+  display: block !important;
+  overflow: visible !important;
+  padding: clamp(96px, 13vh, 124px) clamp(20px, 4vw, 80px) clamp(48px, 8vh, 96px) !important;
 }
+.op-hero-single .op-canvas-slide-inner { margin: 0 auto !important; }
+/* 1/N counter is meaningless for a single document */
+.op-hero-single .op-hero-overlay { display: none !important; }
 
 /* ── Blog-article reading column (flat, single column, clean hierarchy) ── */
 .op-canvas-slide-inner {
@@ -780,9 +787,10 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
 /* Shorter viewports (e.g. laptops): shrink the tag + tighten the rail so the
    top tag and the vertically-centered rail don't collide on the right edge. */
 @media (max-height: 940px) {
-  /* Keep the L/R padding identical to large screens; only the text shrinks. */
+  /* Keep the tag L/R padding identical to large screens; only the text shrinks.
+     Pull the number rail closer to the edge so it needs less room. */
   .op-cst-label { font-size: 13px; max-height: 30vh; }
-  .op-canvas-section-index { gap: 2px; }
+  .op-canvas-section-index { gap: 2px; right: 10px; }
   .op-csi-num { font-size: 9px; }
 }
 
