@@ -222,7 +222,7 @@ const CANVAS_JS = `
         e.preventDefault();
         var el = document.getElementById(id);
         if (!el) return;
-        openSection(el);                       // expand the target (accordion)
+        expandDoc(el.closest('.op-hero-slide')); // make sure its document is open
         if (el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
@@ -269,31 +269,28 @@ const CANVAS_JS = `
     });
   }
 
-  // ── Accordion: each document's sections collapse; one open at a time ──
-  function openSection(el) {
-    var slide = el.closest('.op-hero-slide');
-    var secs = slide ? slide.querySelectorAll('.op-section[id]') : [el];
-    Array.prototype.forEach.call(secs, function (s) {
-      s.classList.remove('op-open');
-      var t = s.querySelector('.op-section-title');
-      if (t) t.setAttribute('aria-expanded', 'false');
-    });
-    el.classList.add('op-open');
-    var ot = el.querySelector('.op-section-title');
-    if (ot) ot.setAttribute('aria-expanded', 'true');
+  // ── Document accordion: older docs collapse to a title+description card;
+  //    click the header to expand/collapse the whole document. ──
+  function expandDoc(slide) {
+    if (!slide || !slide.classList.contains('op-doc-collapsed')) return;
+    slide.classList.add('op-open');
+    var h = slide.querySelector('.op-page-header');
+    if (h) h.setAttribute('aria-expanded', 'true');
   }
   // Only older documents collapse — the newest (slide 0) stays fully expanded.
   Array.from(document.querySelectorAll('.op-hero-slide.op-doc-collapsed')).forEach(function (slide) {
-    Array.from(slide.querySelectorAll('.op-section[id]')).forEach(function (sec) {
-      var title = sec.querySelector('.op-section-title');
-      if (!title) return;
-      title.setAttribute('role', 'button');
-      title.setAttribute('tabindex', '0');
-      title.setAttribute('aria-expanded', 'false');
-      title.addEventListener('click', function () { openSection(sec); });
-      title.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSection(sec); }
-      });
+    var header = slide.querySelector('.op-page-header');
+    if (!header) return;
+    header.setAttribute('role', 'button');
+    header.setAttribute('tabindex', '0');
+    header.setAttribute('aria-expanded', 'false');
+    function toggle() {
+      var open = slide.classList.toggle('op-open');
+      header.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    header.addEventListener('click', toggle);
+    header.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
     });
   });
 
@@ -758,31 +755,27 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
 }
 .op-canvas-slide-inner .op-section-body { margin-top: 14px; }
 
-/* ── Older documents (op-doc-collapsed): accordion of section cards ── */
-.op-doc-collapsed .op-canvas-slide-inner .op-section {
-  margin-top: 10px;
-  padding: clamp(15px, 1.9vw, 20px) clamp(18px, 2.2vw, 26px);
+/* ── Older documents (op-doc-collapsed): one collapsed card per document ──
+   Collapsed shows only the document title + description; click to expand the
+   whole document (sections then render in normal full flow). */
+.op-doc-collapsed .op-canvas-slide-inner {
   border: 1px solid var(--op-color-border);
-  border-radius: var(--op-radius-std, 10px);
+  border-radius: var(--op-radius-std, 12px);
   background: var(--op-color-card, var(--op-color-surface));
-  scroll-margin-top: clamp(84px, 12vh, 120px);
-  transition: border-color 0.15s ease;
+  padding: clamp(18px, 2.2vw, 26px) clamp(20px, 2.6vw, 32px);
 }
-.op-doc-collapsed .op-canvas-slide-inner .op-page-main > .op-section:first-child {
-  margin-top: 0; padding-top: clamp(15px, 1.9vw, 20px); border-top: 1px solid var(--op-color-border);
-}
-.op-doc-collapsed .op-section.op-open { border-color: var(--op-color-fg-muted); }
-.op-doc-collapsed .op-canvas-slide-inner .op-section-title {
-  font-size: clamp(17px, 1.9vw, 21px);
-  cursor: pointer;
-  user-select: none;
+.op-doc-collapsed.op-open .op-canvas-slide-inner { border-color: var(--op-color-fg-muted); }
+/* Header = clickable title row + description */
+.op-doc-collapsed .op-page-header { cursor: pointer; user-select: none; margin: 0; }
+.op-doc-collapsed .op-canvas-slide-inner .op-page-title {
+  font-size: clamp(20px, 2.4vw, 27px);
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin: 0;
 }
-.op-doc-collapsed .op-canvas-slide-inner .op-section-title::after {
+.op-doc-collapsed .op-canvas-slide-inner .op-page-title::after {
   content: "";
   flex: none;
   width: 9px; height: 9px;
@@ -792,13 +785,21 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   transition: transform 0.2s ease;
   margin: 0 2px 4px 0;
 }
-.op-doc-collapsed .op-section.op-open > .op-section-title::after {
+.op-doc-collapsed.op-open .op-canvas-slide-inner .op-page-title::after {
   transform: rotate(-135deg);
   margin-bottom: 0;
 }
-.op-doc-collapsed .op-canvas-slide-inner .op-section-lead { font-size: 0.92rem; margin: 8px 0 0; }
-.op-doc-collapsed .op-canvas-slide-inner .op-section-body { display: none; margin-top: 16px; }
-.op-doc-collapsed .op-section.op-open > .op-section-body { display: block; }
+/* Description (lede) — hidden on the featured doc, shown here as the summary */
+.op-doc-collapsed .op-canvas-slide-inner .op-page-subtitle {
+  display: block;
+  margin: 10px 0 0;
+  font-size: 0.97rem;
+  line-height: 1.55;
+  color: var(--op-color-fg-muted);
+}
+/* Body (all sections) collapses; expands when the document is open */
+.op-doc-collapsed .op-canvas-slide-inner .op-page-main { display: none; margin-top: clamp(22px, 3vh, 34px); }
+.op-doc-collapsed.op-open .op-canvas-slide-inner .op-page-main { display: block; }
 
 /* Subheadings + body rhythm */
 .op-canvas-slide-inner .op-heading-h3 {
