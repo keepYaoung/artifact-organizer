@@ -80,6 +80,29 @@ menu item in the top nav **and** the footer. Each document gets its own `#slug`
 URL, so any document is directly shareable. The chosen theme, author, and hosting
 choice persist on the store — pass them once.
 
+## Publishing (massage → GitHub Pages)
+
+> Full detail: [SKILL.md → Publishing to GitHub Pages](skills/artifact-organizer/SKILL.md#publishing-to-github-pages)
+
+The output is a single self-contained `.html`, so it opens on any machine that
+has the file — but to view it from *another* computer you either send the file
+or host it. When the user picks GitHub Pages, massage the output into a repo and
+publish (confirm before creating a public repo or enabling Pages):
+
+```bash
+# 1. entry deck must be index.html (Pages serves it at the root)
+cp deck.html site/index.html
+# 2. repo + push
+cd site && git init -b main && git add -A && git commit -m "Publish"
+gh repo create <name> --public --source . --push
+# 3. enable Pages
+gh api -X POST "repos/<owner>/<name>/pages" -f "source[branch]=main" -f "source[path]=/"
+# 4. URL → https://<owner>.github.io/<name>/   (re-publish = commit + push again)
+```
+
+Fonts/embedded artifacts may pull from CDNs, so a live page needs internet for
+those; layout and text are inlined.
+
 ## Don't
 
 > Full detail: [SKILL.md → Semantic-only props](skills/artifact-organizer/SKILL.md#semantic-only-props) · [Error handling](skills/artifact-organizer/SKILL.md#error-handling)
