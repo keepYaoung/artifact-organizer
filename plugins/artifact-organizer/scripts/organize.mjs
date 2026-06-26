@@ -122,6 +122,18 @@ function htmlTitle(html) {
  * `--embed` is the explicit opt-out that keeps an artifact verbatim in an iframe.
  */
 function readArtifact(addPath, force = {}) {
+  // "-" reads the artifact from stdin — no local file needed. Handy for HTML you
+  // have in hand: `printf '%s' "$html" | organize --add - --embed`. Without
+  // --embed, stdin must be a JSON envelope.
+  if (addPath === "-") {
+    const raw = readFileSync(0, "utf8");
+    if (force.embed) return { rawHtml: raw, htmlTitle: htmlTitle(raw) };
+    try {
+      return { envelope: JSON.parse(raw) };
+    } catch {
+      throw new Error("stdin is not a JSON envelope. Add --embed to embed it as raw HTML, or pipe a rebuilt envelope.");
+    }
+  }
   const isHtml = /\.html?$/i.test(addPath);
   if (isHtml) {
     const sidecar = addPath.replace(/\.html?$/i, "") + ".json";
@@ -168,8 +180,8 @@ function parseArgs(argv) {
 
 Options:
   --store <path>        Persistent canvas JSON (created if missing) [required]
-  --add <path>          Artifact to stack: JSON envelope, or HTML (sidecar .json if present, else embedded as-is) [required]
-  --embed               Force-embed an HTML file verbatim (iframe), ignoring any sidecar
+  --add <path|->        Artifact to stack: a JSON envelope, an HTML file, or "-" to read from stdin [required]
+  --embed               Embed the artifact verbatim (iframe); with "-" embeds stdin HTML without a file
   --title <s>           Title for the stacked artifact (else taken from the envelope)
   --date <s>            Date label for the artifact (default: today)
   --description <s>     Subtitle shown under the featured slide title

@@ -30,9 +30,9 @@ Do **not** use Artifact Organizer when:
 - The user explicitly asks to stay in the terminal.
 - The task is pure code editing with no explanation artifact needed.
 
-## Step 0 — initial setup: ask the user before generating anything
+## Step 0: ask the user first
 
-A few quick questions up front (ask together on first use): **(a) the house style**, **(b) where the output should live** ([Step 0b](#step-0b--ask-where-the-output-should-live-local--free-github-pages--your-domain)), and **(c) footer identity** — the nickname + email shown in the page footer. **Default to the user's git identity** (`git config user.name` and `git config user.email`); offer those and let them override. Pass them when stacking: `organize.mjs --author "<nickname>" --email "<email>"` (they persist on the store, so ask once). All of this persists so you only ask once.
+A few quick questions up front (ask together on first use): **(a) the house style**, **(b) where the output should live** ([Step 0b](#step-0b-output-destination)), and **(c) footer identity** — the nickname + email shown in the page footer. **Default to the user's git identity** (`git config user.name` and `git config user.email`); offer those and let them override. Pass them when stacking: `organize.mjs --author "<nickname>" --email "<email>"` (they persist on the store, so ask once). All of this persists so you only ask once.
 
 **Your very first action is to ask the user which visual style (theme) they want.** The organizer renders every artifact — and every document you stack into the feed — in one shared *house style*, so this choice is foundational. Decide it before generating or stacking anything; don't pick a theme for the user silently on the first run.
 
@@ -109,7 +109,7 @@ RENDERER=$(awk -F': *' '/^renderer:/{print $2; exit}' "$PREF")
 
 When invoking the renderer in later steps, always pass `--theme "$THEME"` and `--renderer "$RENDERER"`. Color mode is intentionally not passed — both variants are inlined and toggled at view time.
 
-### Step 0b — ask where the output should live (local / free GitHub Pages / your domain)
+### Step 0b: output destination
 
 Right after the style question, tell the user their options in plain language and ask which they want — outputs are single self-contained HTML files, so all three are easy:
 
@@ -338,7 +338,7 @@ No `--theme` or `--mode` flags needed — the canvas template always uses `shadc
 | The audience needs dark/light toggle + history feed | Theme preference matters |
 | The content is an analytics/status report | The content is a narrative, comparison, or code review |
 
-## Stacking mode — `organize.mjs` (accumulate artifacts over time)
+## Stacking mode
 
 The **organizer** keeps one persistent, themed canvas and *stacks* artifacts
 onto it as they arrive. Each call takes ONE artifact: it becomes the featured
@@ -448,7 +448,7 @@ Use these only through `/artifact-organizer:slides`:
 | Slides | `artifact-organizer/SlideDeck` | Slide container. Props: `aspect`, `transition?`, `footer?`. Children: Slide[]. |
 | Slides | `artifact-organizer/Slide` | Single slide. Props: `layout` (`title`\|`content`\|`two-col`\|`quote`\|`image`\|`section`), `title?`, `subtitle?`, `bullets?`, `image?`, `quote?`. |
 
-## Semantic-only props — NEVER style
+## Semantic-only props
 
 `props` carries **data**, not presentation. The renderer and `assets/base.css` own every visual decision.
 
