@@ -201,13 +201,10 @@ const CANVAS_JS = `
   if (csiItems.length) {
     var scroller = document.querySelector('.op-hero-slide-active .op-canvas-slide-body')
                 || document.querySelector('.op-canvas-slide-body');
-    var tagLabel = document.querySelector('.op-canvas-section-tag .op-cst-label');
-    var byId = {}, titleById = {};
+    var byId = {};
     csiItems.forEach(function (a) {
       var id = a.getAttribute('data-csi');
       byId[id] = a;
-      var lbl = a.querySelector('.op-csi-label');
-      titleById[id] = lbl ? lbl.textContent : '';
       a.addEventListener('click', function (e) {
         e.preventDefault();
         var el = document.getElementById(id);
@@ -221,7 +218,6 @@ const CANVAS_JS = `
           csiItems.forEach(function (x) { x.classList.remove('op-csi-active'); });
           var a = byId[en.target.id];
           if (a) a.classList.add('op-csi-active');
-          if (tagLabel && titleById[en.target.id]) tagLabel.textContent = titleById[en.target.id];
         });
       }, { root: scroller, rootMargin: '-15% 0px -75% 0px', threshold: 0 });
       csiItems.forEach(function (a) {
@@ -386,9 +382,9 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
       ).join("") +
       `</nav>`
     : "";
-  const sectionTagHtml = sections.length >= 1
+  const sectionTagHtml = meta.title
     ? `<aside class="op-canvas-section-tag" aria-hidden="true">` +
-      `<span class="op-cst-label">${escapeHtml(sections[0].title)}</span>` +
+      `<span class="op-cst-label">${escapeHtml(meta.title)}</span>` +
       `<span class="op-cst-arrow">↘</span>` +
       `</aside>`
     : "";
@@ -666,7 +662,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
 /* ── Right-rail section index (vertical, centered) ── */
 .op-canvas-section-index {
   position: fixed;
-  right: clamp(56px, 6vw, 92px);   /* sits just left of the edge tag */
+  right: clamp(14px, 2vw, 30px);
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -713,12 +709,11 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   color: var(--op-color-accent);
 }
 
-/* ── Right-edge vertical tag (frameout "Get in touch" style) ── */
+/* ── Fixed document-title tag, top-right just under the header (frameout) ── */
 .op-canvas-section-tag {
   position: fixed;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  top: clamp(56px, 7vh, 76px);
   z-index: 41;
   display: flex;
   flex-direction: column;
@@ -727,8 +722,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   padding: 18px 11px;
   background: var(--op-color-fg);
   color: var(--op-color-bg);
-  border-radius: 12px 0 0 12px;
-  box-shadow: var(--op-shadow-card);
+  border-radius: 0;
 }
 .op-cst-label {
   writing-mode: vertical-rl;
@@ -737,7 +731,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.25;
-  max-height: 56vh;
+  max-height: 44vh;
   overflow: hidden;
 }
 .op-cst-arrow { font-size: 12px; opacity: 0.75; }
