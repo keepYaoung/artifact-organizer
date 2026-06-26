@@ -30,9 +30,15 @@ Do **not** use Artifact Organizer when:
 - The user explicitly asks to stay in the terminal.
 - The task is pure code editing with no explanation artifact needed.
 
-## Step 0 — resolve the user's theme + renderer preference (always run first)
+## Step 0 — ask the user which house style to use (always, before anything else)
 
-Before building any envelope, resolve the user's theme and renderer mode. If no preference file exists yet, prompt once, save, then proceed. This runs on every invocation of the main skill and its variants.
+**Your very first action is to ask the user which visual style (theme) they want.** The organizer renders every artifact — and every document you stack into the feed — in one shared *house style*, so this choice is foundational. Decide it before generating or stacking anything; don't pick a theme for the user silently on the first run.
+
+Ask **once**, then persist — re-asking on every run is wrong:
+
+- **If a preference is already saved** (`./.artifact-organizer/preference.md` or `~/.artifact-organizer/preference.md`), read it and proceed silently. Do **not** re-ask.
+- **Otherwise (first run)**, ask via `AskUserQuestion` — present the 7 themes below as choices — then save the answer to the preference file and continue.
+- The user can switch anytime ("use tailwind instead", or delete the preference file to be re-asked). When they name a theme mid-conversation, honor it for that call and offer to save it as the new default.
 
 Color mode (light/dark) is **not** a preference: every output inlines both variants, and the toggle button + `prefers-color-scheme` handle switching at view time.
 
