@@ -246,6 +246,11 @@ export function renderCanvas(doc, REGISTRY, options = {}) {
   if (!existsSync(resolve(PLUGIN_ROOT, `themes/${themeName}.css`))) {
     throw new Error(`Unknown theme "${themeName}". Place themes/${themeName}.css to add it.`);
   }
+  // Initial color mode. Canvas is dark-first by default; override to "light"
+  // when wrapping a light artifact so the chrome matches. Toggle still works.
+  const initialMode = (options.mode === "light" || options.mode === "dark")
+    ? options.mode
+    : (meta.mode === "light" || meta.mode === "dark" ? meta.mode : "dark");
   const feat    = doc.featured;
   const history = Array.isArray(doc.history) ? doc.history : [];
 
@@ -630,7 +635,7 @@ body { margin: 0; padding: 0 !important; background: var(--op-color-bg); }
   const interactiveJs = readFileSync(resolve(PLUGIN_ROOT, "assets/interactive.js"), "utf8");
 
   return `<!doctype html>
-<html lang="en" data-theme="${escapeHtml(themeName)}" data-mode="dark">
+<html lang="en" data-theme="${escapeHtml(themeName)}" data-mode="${escapeHtml(initialMode)}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">

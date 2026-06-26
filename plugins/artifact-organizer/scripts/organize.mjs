@@ -67,7 +67,7 @@ export function extractArtifact(doc) {
  * Stack one artifact onto a store (pure — returns a new store object).
  * The previous featured demotes to the front of history.
  */
-export function stack(store, { content, title, date, description, agent, topic, theme }) {
+export function stack(store, { content, title, date, description, agent, topic, theme, mode }) {
   const next = {
     template: "canvas",
     meta: { ...(store.meta || {}) },
@@ -90,6 +90,7 @@ export function stack(store, { content, title, date, description, agent, topic, 
   if (agent) next.meta.agent = agent;
   if (topic) next.meta.topic = topic;
   if (theme) next.meta.theme = theme;
+  if (mode) next.meta.mode = mode;
   return next;
 }
 
@@ -109,27 +110,37 @@ function htmlTitle(html) {
 /**
  * Read an artifact path. Returns a tagged result:
  *   { envelope }            — a semantic JSON envelope (JSON file, or HTML with sidecar)
- *   { rawHtml, htmlTitle }  — a raw HTML file with no sidecar (embed as-is)
+ *   { rawHtml, htmlTitle }  — a raw HTML file, ONLY when `force.embed` is set
  *
- * With `force.embed`, an HTML file is always embedded as-is even if a sidecar
- * exists (the "stack it verbatim" path).
+ * The organizer's whole point is to weave artifacts into one native site in the
+ * chosen theme, so a raw HTML file is NOT auto-embedded: the caller is expected
+ * to rebuild it as native components first (stripping the source's own styling).
+ * `--embed` is the explicit opt-out that keeps an artifact verbatim in an iframe.
  */
 function readArtifact(addPath, force = {}) {
   const isHtml = /\.html?$/i.test(addPath);
   if (isHtml) {
     const sidecar = addPath.replace(/\.html?$/i, "") + ".json";
-    if (!force.embed && existsSync(sidecar)) {
+    if (force.embed) {
+      const rawHtml = readFileSync(addPath, "utf8");
+      return { rawHtml, htmlTitle: htmlTitle(rawHtml) };
+    }
+    if (existsSync(sidecar)) {
       return { envelope: JSON.parse(readFileSync(sidecar, "utf8")) };
     }
-    const rawHtml = readFileSync(addPath, "utf8");
-    return { rawHtml, htmlTitle: htmlTitle(rawHtml) };
+    throw new Error(
+      `"${basename(addPath)}" is raw HTML with no semantic envelope. The organizer ` +
+      `re-renders artifacts in the chosen theme, so rebuild this as native components ` +
+      `first (strip the source's own styling) and --add that JSON. To keep it verbatim ` +
+      `in an isolated iframe instead, pass --embed.`
+    );
   }
   return { envelope: JSON.parse(readFileSync(addPath, "utf8")) };
 }
 
 function parseArgs(argv) {
   const a = { store: null, add: null, title: null, date: null, description: null,
-              theme: null, agent: null, topic: null, out: null, initTitle: null,
+              theme: null, mode: null, agent: null, topic: null, out: null, initTitle: null,
               embed: false, quiet: false };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
@@ -140,6 +151,7 @@ function parseArgs(argv) {
       case "--date": a.date = argv[++i]; break;
       case "--description": a.description = argv[++i]; break;
       case "--theme": a.theme = argv[++i]; break;
+      case "--mode": a.mode = argv[++i]; break;
       case "--agent": a.agent = argv[++i]; break;
       case "--topic": a.topic = argv[++i]; break;
       case "--out": a.out = argv[++i]; break;
@@ -156,6 +168,7 @@ Options:
   --date <s>            Date label for the artifact (default: today)
   --description <s>     Subtitle shown under the featured slide title
   --theme <name>        notion|linear|vercel|stripe|supabase|apple|tailwind (sticks to the store)
+  --mode <light|dark>   Initial color mode of the canvas (default dark; use light for light artifacts)
   --agent <s>           Agent name shown on every slide
   --topic <s>           Topic badge shown on every slide
   --out <path>          Rendered HTML (default: <store>.html)
@@ -209,11 +222,15 @@ function main() {
     agent: args.agent,
     topic: args.topic,
     theme: args.theme,
+    mode: args.mode,
   });
 
   let html;
   try {
-    html = renderCanvas(store, REGISTRY, { theme: args.theme || store.meta?.theme });
+    html = renderCanvas(store, REGISTRY, {
+      theme: args.theme || store.meta?.theme,
+      mode: args.mode || store.meta?.mode,
+    });
   } catch (e) { console.error(`Render error: ${e.stack || e.message}`); process.exit(4); }
 
   const outAbs = resolve(args.out || storeAbs.replace(/\.json$/i, "") + ".html");

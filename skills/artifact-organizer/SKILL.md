@@ -343,33 +343,42 @@ a sibling `.json` sidecar) **and** a raw HTML file.
 
 ### Stacking an HTML artifact the user hands you
 
-When the user gives you an HTML file (or any artifact) and says *"stack this"*,
-the goal is for it to land in the dashboard automatically. Two paths — **prefer
-the first, fall back to the second**, and let the user override either way:
+**This is the heart of the organizer.** When the user hands you an HTML file (a
+Claude chat artifact, an export from another tool, anything) and says *"stack
+this"*, you do **not** drop the file in as-is. You **absorb its content into the
+house style** — strip the source's own styling and rebuild it as native
+components, so every stacked artifact reads as one cohesive native website in
+the chosen theme, not a scrapbook of foreign frames.
 
-**1. Rebuild as native components (default).** Read the HTML and reconstruct it
-as a semantic envelope so the stacked artifact gets first-class native
-components and can adopt the canvas theme.
+**Rebuild as native components (the default — do this).**
 
-- **Follow the source's existing style.** If the HTML already has a deliberate
-  look (a specific theme, palette, layout), pick the bundled theme closest to it
-  and preserve structure/emphasis — don't flatten it.
-- **Extend when the catalog lacks something.** If the source has a visual with
-  no catalog equivalent (an unusual chart, a widget), build the nearest native
-  component — you may web-fetch a reference implementation (e.g. Tailwind UI,
-  shadcn/ui) to match it faithfully. Decide this yourself; the user can also
-  tell you which way to go.
-- Then pass the rebuilt envelope JSON to `--add`.
+1. **Read the source and extract its content**, not its styling: headings →
+   `Section`/`Heading`, paragraphs/lists → `Prose`, tables → `DataTable`,
+   highlighted boxes → `Callout`, metrics → `KPICard`, code → `CodeBlock`,
+   diagrams → `Mermaid`/`FlowChart`/etc.
+2. **Discard the source's own CSS/theme entirely.** The artifact's original
+   colors, fonts, and layout do not carry over — the canvas theme owns the look.
+   The result must match the rest of the deck, not the source.
+3. **Extend when the catalog lacks something.** If the source has a visual with
+   no native equivalent (an unusual chart, a widget), build the nearest native
+   component — you may web-fetch a reference (e.g. Tailwind UI, shadcn/ui) to
+   match its shape. Decide this yourself; the user can steer.
+4. **Pass the rebuilt envelope JSON to `--add`.** A raw HTML file with no sidecar
+   is rejected on purpose — rebuild first.
 
-**2. Embed verbatim (fallback / "just stack it as-is").** When the artifact
-shouldn't be reinterpreted — or the user explicitly wants it kept exactly —
-hand the HTML file straight to `--add`. With no sidecar it is **auto-embedded**
-as-is in a sandboxed `<iframe srcdoc>` (the `Embed` component); the artifact
-keeps its own styling and scripts but won't adopt the canvas theme. Force this
-path with `--embed`:
+> Always sanity-check `DataTable`: `columns` is `[{key,label}]` and each `rows`
+> entry is an object keyed by those `key`s — not arrays of strings. Canvas mode
+> skips schema validation, so a wrong shape renders as a silently empty table.
+> Validate with `render.mjs --renderer page --validate-only` before stacking.
+
+**Embed verbatim (rare opt-in — only when asked).** If the user explicitly wants
+an artifact kept pixel-for-pixel (a finished design that must not be
+reinterpreted), pass `--embed` to drop it into a sandboxed `<iframe srcdoc>`. It
+keeps its own styling and will **not** match the deck theme — so use it only on
+request, never as the default:
 
 ```bash
-node scripts/organize.mjs --store <deck>.json --add report.html --embed --title "Q3 report"
+node scripts/organize.mjs --store <deck>.json --add design.html --embed --title "Final mock"
 ```
 
 `--theme` sticks to the store (saved in `meta.theme`), so later adds keep the

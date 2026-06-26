@@ -292,7 +292,7 @@ async function main() {
     if (resolveRenderer(doc, { renderer: args.renderer || "auto" }) === "page") {
       html = await render(doc, { theme: args.theme, mode: args.mode, title: args.title });
     } else {
-      html = renderCanvas(doc, REGISTRY, { theme: args.theme });
+      html = renderCanvas(doc, REGISTRY, { theme: args.theme, mode: args.mode });
     }
   } catch (e) {
     if (e.code === "SCHEMA") {

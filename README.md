@@ -67,9 +67,10 @@ node plugins/artifact-organizer/scripts/organize.mjs \
   --add /tmp/hello.json --title "Deploy status" --theme apple
 ```
 
-Run it again with the next artifact and it stacks on top. You can also hand it a
-raw `.html` file — `--add report.html` embeds it as-is, or rebuild it into native
-components first so it adopts the theme.
+Run it again with the next artifact and it stacks on top. Hand it an HTML file
+from anywhere and the agent **rebuilds it as native components in your theme** —
+the source's own styling is stripped, so everything reads as one cohesive site.
+(Need a pixel-perfect copy kept as-is? `--embed` drops it into an iframe instead.)
 
 ---
 
