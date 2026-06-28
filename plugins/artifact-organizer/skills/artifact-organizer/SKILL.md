@@ -125,7 +125,7 @@ Right after the style question, tell the user their options in plain language an
 
 ### Publishing to GitHub Pages
 
-**Easiest: the `publish.mjs` helper** does the whole massage + publish in one idempotent, dry-run-safe step:
+Use the **`publish.mjs` helper**. It deploys a deck into **your own repo's** GitHub Pages under a sub-path — it **never creates a standalone repo**. So a user who forks this project just publishes into their fork:
 
 ```bash
 # DRY RUN by default — prints the plan + the exact git/gh commands, changes nothing:
@@ -134,34 +134,17 @@ node scripts/publish.mjs --store ~/.artifact-organizer/decks/<name>.json --inclu
 node scripts/publish.mjs --store ~/.artifact-organizer/decks/<name>.json --include-sources --confirm
 ```
 
-It builds `<name>-site/index.html` (+ `/sources` with `--include-sources`); the **first** `--confirm` run creates a public repo and enables Pages, **later** runs just commit & push (auto-detected from the site folder's git state). It records the live URL on the store (`meta.publish`) and prints it. It stops clearly if `gh` is missing or unauthenticated — it can't log in for the user. `--repo <name>` overrides the repo name. **Confirm before the first `--confirm`** (publishing is public).
+How it works:
 
-The same flow done by hand (what `publish.mjs` automates) — "massage" the output into a deployable repo, then publish:
-
-1. **Lay out the files.** GitHub Pages serves `index.html` at the site root, so make the entry deck `index.html`. Keep any linked sub-pages and assets next to it with **relative** paths (the renderer already inlines CSS/JS, so a single `index.html` usually suffices). A typical layout:
-   ```
-   site/
-     index.html          # the canvas hub / latest deck
-     <slug>.html         # optional linked sub-pages
-   ```
-2. **Create the repo and push** (use `gh`; confirm the repo name + public visibility first):
-   ```bash
-   cd site
-   git init -b main && git add -A && git commit -m "Publish artifact-organizer site"
-   gh repo create <name> --public --source . --push
-   ```
-   (Or push to an existing repo.)
-3. **Enable Pages** (deploy from the `main` branch root):
-   ```bash
-   gh api -X POST "repos/<owner>/<name>/pages" -f "source[branch]=main" -f "source[path]=/"
-   ```
-   If `gh` can't enable it, tell the user: **Settings → Pages → Build from a branch → `main` / `/ (root)`**.
-4. **Hand back the URL:** `https://<owner>.github.io/<name>/` (live in ~1 minute).
-5. **Re-publishing** (after stacking a new document): re-render, then `git add -A && git commit -m "Update" && git push` — Pages redeploys automatically.
+- **Target repo** = `<your-gh-user>/artifact-organizer` (your fork) by default; override with `--repo <owner/name>`. The repo **must already exist** — `publish.mjs` does not create one.
+- **Each deck → its own sub-path** on the `gh-pages` branch: `https://<you>.github.io/artifact-organizer/<deck>/`. Override the sub-path with `--path <subpath>`.
+- **Idempotent**: the first `--confirm` creates the `gh-pages` branch + enables Pages; later runs update only that deck's sub-folder, leaving sibling decks untouched (it keeps a local working clone in `.pages-<repo>/`).
+- It records the live URL on the store (`meta.publish`) and prints it. Stops clearly if `gh` is missing/unauthenticated (it can't log in for the user) or if the target repo doesn't exist.
+- **Confirm before the first `--confirm`** — publishing is public.
 
 > Fonts load from Google Fonts' CDN and embedded artifacts may reference their own CDNs, so a published page needs internet for those; the layout/text itself is inlined.
 
-For a **custom domain** on top of Pages: `gh api -X PUT "repos/<owner>/<name>/pages" -f cname=<domain>`, then have the user add the DNS records at their registrar (you can't change their DNS).
+For a **custom domain** on top of Pages: `gh api -X PUT "repos/<owner>/<repo>/pages" -f cname=<domain>`, then have the user add the DNS records at their registrar (you can't change their DNS).
 
 ## How to use
 

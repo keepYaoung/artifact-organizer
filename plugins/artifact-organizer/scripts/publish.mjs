@@ -1,21 +1,23 @@
 #!/usr/bin/env node
 /**
- * publish.mjs — one-shot "massage + publish" for an artifact-organizer deck.
+ * publish.mjs — publish an artifact-organizer deck into YOUR own repo's GitHub
+ * Pages, under a sub-path. No standalone repos are ever created.
  *
- *   node publish.mjs --store <deck.json> [--repo <name>] [--include-sources] [--confirm]
+ *   node publish.mjs --store <deck.json> [--repo <owner/name>] [--path <subpath>] [--confirm]
  *
- * What it does (idempotent):
- *   1. Massage: build a <deck>-site/ folder — the rendered deck becomes index.html
- *      (GitHub Pages serves it at the root), optionally with the kept originals.
- *   2. Publish: first run creates a public repo + enables Pages; later runs just
- *      commit & push (auto-detected from the site folder's git state).
- *   3. Record the live URL + repo on the store (meta.publish) and print the URL.
+ * Model: every deck deploys into the `gh-pages` branch of one repo (default:
+ * <your-gh-user>/artifact-organizer — i.e. your fork), each deck in its own
+ * sub-folder. So forking the project just works: your decks land at
+ *   https://<you>.github.io/artifact-organizer/<deck>/
+ * The target repo must already exist (it's your fork); this never creates one.
  *
- * SAFE BY DEFAULT: without --confirm it is a DRY RUN — it prints the exact plan
- * and the git/gh commands it WOULD run, and touches nothing. Publishing is public
- * and outward-facing, so confirm with the user before passing --confirm.
+ * Idempotent: the first deploy creates the gh-pages branch + enables Pages;
+ * later deploys update only that deck's sub-folder, leaving other decks intact.
+ *
+ * SAFE BY DEFAULT: without --confirm it is a DRY RUN — prints the plan and the
+ * git/gh commands it WOULD run, and touches nothing. Publishing is public.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, cpSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, copyFileSync, cpSync } from "node:fs";
 import { dirname, basename, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -26,43 +28,62 @@ export function slugify(s) {
     .replace(/^-+|-+$/g, "") || "deck";
 }
 
+const DEFAULT_REPO = "artifact-organizer";
+const BRANCH = "gh-pages";
+
 /**
- * Compute a publish plan (pure: reads the filesystem to decide, but mutates
- * nothing). This is the "massage" decision — what goes where, which repo/URL,
- * and whether this is a first publish or an update.
+ * Compute a publish plan (pure: reads the filesystem to decide, mutates nothing).
+ * Decides the target repo, the sub-path, the local gh-pages working clone, and
+ * whether this is the first deploy into that clone or an update.
  */
-export function planPublish({ storeAbs, store = {}, htmlAbs, repo, includeSources, owner = "<owner>", hasGit = false }) {
+export function planPublish({ storeAbs, store = {}, htmlAbs, repo, path, includeSources, owner = "<owner>", repoName }) {
   const dir = dirname(storeAbs);
   const baseName = basename(storeAbs).replace(/\.json$/i, "");
-  const siteDir = join(dir, `${baseName}-site`);
   const sourcesDir = join(dir, `${baseName}-sources`);
   const recorded = (store.meta && store.meta.publish) || {};
-  const repoName = repo || recorded.repoName || slugify(baseName);
-  const mode = (hasGit || recorded.repo) ? "update" : "create";
 
-  const copies = [{ from: htmlAbs, to: "index.html" }];
+  // Target repo: --repo "owner/name" | "name" overrides; else recorded; else default.
+  if (repo && repo.includes("/")) { const [o, n] = repo.split("/"); owner = o || owner; repoName = n; }
+  else if (repo) { repoName = repo; }
+  repoName = repoName || recorded.repoName || DEFAULT_REPO;
+  if (!recorded.repoName && recorded.owner) owner = owner; // keep resolved owner
+
+  const subpath = slugify(path || recorded.subpath || baseName);
+  // One local working clone of the repo's gh-pages branch, shared across decks.
+  const pagesDir = join(dir, `.pages-${repoName}`);
+  const hasClone = existsSync(join(pagesDir, ".git"));
+
+  const ownerLc = owner.toLowerCase();
+  const url = `https://${ownerLc}.github.io/${repoName}/${subpath}/`;
+  const mode = hasClone ? "update" : "deploy";
+  const commitMsg = `Publish ${subpath}`;
   const withSources = !!includeSources && existsSync(sourcesDir);
-  if (withSources) copies.push({ from: sourcesDir, to: "sources", dir: true });
 
-  const url = `https://${owner}.github.io/${repoName}/`;
-  const commitMsg = mode === "create" ? "Publish artifact-organizer deck" : "Update artifact-organizer deck";
-  const commands = mode === "create"
-    ? ["git init -b main", "git add -A", `git commit -m "${commitMsg}"`,
-       `gh repo create ${repoName} --public --source . --remote origin --push`,
-       `gh api -X POST repos/${owner}/${repoName}/pages -f "source[branch]=main" -f "source[path]=/"`]
-    : ["git add -A", `git commit -m "${commitMsg}"`, "git push"];
+  const commands = [
+    mode === "deploy"
+      ? `git clone (gh-pages of ${owner}/${repoName}) → ${basename(pagesDir)}/`
+      : `git -C ${basename(pagesDir)} fetch && reset --hard origin/${BRANCH}`,
+    `cp ${basename(htmlAbs)} → ${subpath}/index.html` + (withSources ? ` (+ ${subpath}/sources/)` : ""),
+    `git add -A && commit -m "${commitMsg}" && push origin ${BRANCH}`,
+    `gh api -X POST repos/${owner}/${repoName}/pages -f "source[branch]=${BRANCH}" -f "source[path]=/"  (first deploy only)`,
+  ];
 
-  return { baseName, siteDir, sourcesDir, repoName, owner, url, mode, copies, includeSources: withSources, commitMsg, branch: "main", commands };
+  return { baseName, owner, repoName, repo: `${owner}/${repoName}`, branch: BRANCH, subpath, pagesDir, sourcesDir, htmlAbs, includeSources: withSources, url, mode, commitMsg, commands };
 }
 
-/** Massage step: build the site folder (index.html [+ sources/]). Returns written paths. */
+/**
+ * Lay out the deck inside the gh-pages working clone: <pagesDir>/<subpath>/index.html
+ * (+ /sources). Replaces only this deck's sub-folder. Returns written paths.
+ */
 export function buildSite(plan) {
-  mkdirSync(plan.siteDir, { recursive: true });
-  const written = [];
-  for (const c of plan.copies) {
-    const dest = join(plan.siteDir, c.to);
-    if (c.dir) { cpSync(c.from, dest, { recursive: true }); written.push(dest + "/"); }
-    else { copyFileSync(c.from, dest); written.push(dest); }
+  const destDir = join(plan.pagesDir, plan.subpath);
+  rmSync(destDir, { recursive: true, force: true });
+  mkdirSync(destDir, { recursive: true });
+  const written = [join(destDir, "index.html")];
+  copyFileSync(plan.htmlAbs, join(destDir, "index.html"));
+  if (plan.includeSources) {
+    cpSync(plan.sourcesDir, join(destDir, "sources"), { recursive: true });
+    written.push(join(destDir, "sources") + "/");
   }
   return written;
 }
@@ -76,11 +97,12 @@ function tryRun(file, args, opts = {}) {
 }
 
 function parseArgs(argv) {
-  const a = { store: null, repo: null, html: null, includeSources: false, confirm: false, dryRun: false, quiet: false };
+  const a = { store: null, repo: null, path: null, html: null, includeSources: false, confirm: false, dryRun: false, quiet: false };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
       case "--store": a.store = argv[++i]; break;
       case "--repo": a.repo = argv[++i]; break;
+      case "--path": a.path = argv[++i]; break;
       case "--html": a.html = argv[++i]; break;
       case "--include-sources": a.includeSources = true; break;
       case "--confirm": a.confirm = true; break;
@@ -89,14 +111,16 @@ function parseArgs(argv) {
       case "--help":
         console.log(`Usage: publish --store <deck.json> [options]
 
-Massage a rendered deck into a GitHub Pages site and publish it (idempotent).
+Deploy a rendered deck into YOUR repo's GitHub Pages, under a sub-path.
+No standalone repo is created — it publishes into your own (forked) repo.
 SAFE BY DEFAULT: prints the plan and runs nothing unless --confirm is given.
 
 Options:
   --store <path>        The deck store JSON (its <name>.html must already exist) [required]
-  --repo <name>         Repo name to create/use (default: the deck's slug)
-  --include-sources     Also publish the kept originals (<name>-sources/ → /sources)
-  --confirm             Actually publish (create repo / enable Pages / push). Omit = dry run.
+  --repo <owner/name>   Target repo (default: <your-gh-user>/artifact-organizer)
+  --path <subpath>      Sub-path under the repo (default: the deck's slug)
+  --include-sources     Also publish the kept originals (→ <subpath>/sources)
+  --confirm             Actually publish (push gh-pages / enable Pages). Omit = dry run.
   --dry-run             Force a dry run even with --confirm
   --html <path>         Deck HTML to publish (default: <store>.html)
   --quiet               Only print the final URL`);
@@ -110,10 +134,9 @@ function printPlan(plan, { dryRun }) {
   const lines = [
     `${dryRun ? "DRY RUN — nothing will change." : "Publishing…"}`,
     ``,
-    `  mode        ${plan.mode === "create" ? "first publish (create repo + enable Pages)" : "update (commit + push)"}`,
-    `  repo        ${plan.repoName}`,
-    `  site folder ${plan.siteDir}`,
-    `  files       ${plan.copies.map(c => c.to + (c.dir ? "/" : "")).join(", ")}`,
+    `  repo        ${plan.repo}  (branch: ${plan.branch})`,
+    `  sub-path    /${plan.subpath}/` + (plan.includeSources ? "  (+ sources)" : ""),
+    `  mode        ${plan.mode === "deploy" ? "first deploy (create gh-pages + enable Pages)" : "update this deck's sub-folder"}`,
     `  URL         ${plan.url}`,
     ``,
     `  commands ${dryRun ? "that WOULD run" : ""}:`,
@@ -121,6 +144,26 @@ function printPlan(plan, { dryRun }) {
   ];
   if (dryRun) lines.push(``, `  Re-run with --confirm to publish.`);
   console.error(lines.join("\n"));
+}
+
+/** Prepare a local working clone of the repo's gh-pages branch (orphan if new). */
+function preparePagesClone(plan) {
+  const dir = plan.pagesDir, cwd = { cwd: dir };
+  const repoUrl = `https://github.com/${plan.owner}/${plan.repoName}.git`;
+  if (!existsSync(join(dir, ".git"))) {
+    mkdirSync(dir, { recursive: true });
+    run("git", ["init", "-b", plan.branch], cwd);
+    run("git", ["remote", "add", "origin", repoUrl], cwd);
+  }
+  tryRun("git", ["fetch", "origin", plan.branch, "--depth", "1"], cwd);
+  if (tryRun("git", ["rev-parse", "--verify", `origin/${plan.branch}`], cwd).ok) {
+    run("git", ["checkout", "-B", plan.branch, `origin/${plan.branch}`], cwd);
+    run("git", ["reset", "--hard", `origin/${plan.branch}`], cwd);
+  } else {
+    // No gh-pages yet → start an empty orphan branch.
+    tryRun("git", ["checkout", "--orphan", plan.branch], cwd);
+    tryRun("git", ["rm", "-rf", "--cached", "."], cwd);
+  }
 }
 
 function main() {
@@ -138,8 +181,6 @@ function main() {
   }
 
   const dryRun = args.dryRun || !args.confirm;
-  const siteDir = join(dirname(storeAbs), basename(storeAbs).replace(/\.json$/i, "") + "-site");
-  const hasGit = existsSync(join(siteDir, ".git"));
 
   // Resolve the GitHub owner. Only touch gh when actually publishing.
   let owner = (store.meta && store.meta.publish && store.meta.publish.owner) || "<owner>";
@@ -151,42 +192,46 @@ function main() {
     owner = who.out;
   }
 
-  const plan = planPublish({ storeAbs, store, htmlAbs, repo: args.repo, includeSources: args.includeSources, owner, hasGit });
+  const plan = planPublish({ storeAbs, store, htmlAbs, repo: args.repo, path: args.path, includeSources: args.includeSources, owner });
 
   if (dryRun) { printPlan(plan, { dryRun: true }); process.exit(0); }
   if (!args.quiet) printPlan(plan, { dryRun: false });
 
-  // ── Massage ──
-  buildSite(plan);
-  const cwd = plan.siteDir;
+  // Target repo must exist (it's your fork). Never create one here.
+  if (!tryRun("gh", ["repo", "view", plan.repo], {}).ok) {
+    console.error(`Target repo ${plan.repo} not found.\nFork keepYaoung/artifact-organizer (or create ${plan.repo}), then re-run — or pass --repo <owner/name>.`);
+    process.exit(5);
+  }
 
-  // ── Publish (idempotent) ──
   try {
-    if (plan.mode === "create") {
-      run("git", ["init", "-b", "main"], { cwd });
-      run("git", ["add", "-A"], { cwd });
-      run("git", ["commit", "-m", plan.commitMsg], { cwd });
-      run("gh", ["repo", "create", plan.repoName, "--public", "--source", ".", "--remote", "origin", "--push"], { cwd });
-      const pg = tryRun("gh", ["api", "-X", "POST", `repos/${owner}/${plan.repoName}/pages`, "-f", "source[branch]=main", "-f", "source[path]=/"], { cwd });
-      if (!pg.ok && !/already|409|exists/i.test(pg.err)) console.error(`Note: enabling Pages reported: ${pg.err}\nIf needed, enable it manually: Settings → Pages → branch main / root.`);
-    } else {
-      run("git", ["add", "-A"], { cwd });
-      const dirty = run("git", ["status", "--porcelain"], { cwd });
-      if (dirty) { run("git", ["commit", "-m", plan.commitMsg], { cwd }); run("git", ["push"], { cwd }); }
-      else if (!args.quiet) console.error("  (no changes to push)");
+    preparePagesClone(plan);
+    buildSite(plan);
+    const cwd = { cwd: plan.pagesDir };
+    run("git", ["add", "-A"], cwd);
+    const dirty = run("git", ["status", "--porcelain"], cwd);
+    if (dirty) {
+      run("git", ["commit", "-m", plan.commitMsg], cwd);
+      run("git", ["push", "-u", "origin", plan.branch], cwd);
+    } else if (!args.quiet) {
+      console.error("  (no changes to push)");
+    }
+    // Enable Pages (first deploy). Tolerate "already enabled".
+    const pg = tryRun("gh", ["api", "-X", "POST", `repos/${plan.owner}/${plan.repoName}/pages`, "-f", `source[branch]=${plan.branch}`, "-f", "source[path]=/"]);
+    if (!pg.ok && !/already|409|exists/i.test(pg.err)) {
+      console.error(`Note: enabling Pages reported: ${pg.err}\nIf needed, set Settings → Pages → branch ${plan.branch} / root.`);
     }
   } catch (e) {
     console.error(`Publish failed: ${String(e.stderr || e.message).trim()}`);
     process.exit(6);
   }
 
-  // ── Record the live URL + repo on the store ──
+  // Record the live URL + target on the store.
   store.meta = store.meta || {};
-  store.meta.publish = { repoName: plan.repoName, owner, repo: `${owner}/${plan.repoName}`, url: plan.url, branch: "main", includeSources: plan.includeSources };
+  store.meta.publish = { owner, repoName: plan.repoName, repo: plan.repo, branch: plan.branch, subpath: plan.subpath, url: plan.url, includeSources: plan.includeSources };
   try { writeFileSync(storeAbs, JSON.stringify(store, null, 2) + "\n", "utf8"); } catch (e) { console.error(`Could not record URL on store: ${e.message}`); }
 
   if (args.quiet) console.log(plan.url);
-  else console.error(`\n✓ Live at ${plan.url}  (Pages can take ~1 min on first publish)`);
+  else console.error(`\n✓ Live at ${plan.url}  (Pages can take ~1 min on first deploy)`);
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;

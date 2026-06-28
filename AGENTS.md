@@ -87,14 +87,14 @@ adds; pass `--source <file>` when you `--add` a rebuilt JSON envelope). The stor
 records the path on `meta.source` and each `history[]` entry, so no original is
 lost.
 
-## Publishing (massage → GitHub Pages)
+## Publishing (→ your repo, GitHub Pages sub-path)
 
 > Full detail: [SKILL.md → Publishing to GitHub Pages](skills/artifact-organizer/SKILL.md#publishing-to-github-pages)
 
 The output is a single self-contained `.html`, so it opens on any machine that
 has the file — but to view it from *another* computer you either send the file
 or host it. When the user picks GitHub Pages, use the **`publish.mjs`** helper —
-it does the whole massage + publish in one idempotent step:
+it deploys into **their own repo** (their fork), never a standalone repo:
 
 ```bash
 # 1. preview (DRY RUN — default, no side effects): shows the plan + exact commands
@@ -103,13 +103,16 @@ node …/scripts/publish.mjs --store ~/.artifact-organizer/decks/<name>.json --i
 node …/scripts/publish.mjs --store ~/.artifact-organizer/decks/<name>.json --include-sources --confirm
 ```
 
-What it does: renders the deck into `<name>-site/index.html` (+ `/sources` with
-`--include-sources`), first run creates a public repo and enables Pages, later
-runs just commit & push (auto-detected). It records the live URL on the store
-(`meta.publish`) and prints it. **It is dry-run by default** — only `--confirm`
-publishes, so confirm with the user first; it stops clearly if `gh` is missing
-or unauthenticated (it can't log in for them). Fonts/embedded artifacts may pull
-from CDNs, so a live page needs internet for those; layout and text are inlined.
+What it does: deploys the deck into `<you>/artifact-organizer` (override with
+`--repo <owner/name>`) on the **`gh-pages` branch under a sub-path** — each deck
+gets `https://<you>.github.io/artifact-organizer/<deck>/` (override with
+`--path`). The target repo must already exist; it is **never** created here.
+First `--confirm` makes the `gh-pages` branch + enables Pages; later runs update
+only that deck's sub-folder (siblings untouched). Records the live URL on
+`meta.publish`. **Dry-run by default** — only `--confirm` publishes, so confirm
+with the user first; it stops clearly if `gh` is missing/unauthenticated or the
+repo doesn't exist. Fonts/embedded artifacts may pull from CDNs, so a live page
+needs internet for those; layout and text are inlined.
 
 ## Don't
 
